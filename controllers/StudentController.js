@@ -164,6 +164,7 @@ const uploadExcel = async (req, res) => {
     if (!req.file || !year) {
       return res.status(400).send("❌ File or year missing");
     }
+    req.app.locals.dbYear = year;
 
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[1]];
