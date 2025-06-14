@@ -9,7 +9,8 @@ const companySchema = new mongoose.Schema({
   cgpa: { type: Number, required: true, min: 0, max: 100 },
   historyofArrears: { type: String, required: true },
   currentArrears: { type: String, required: true },
-  interviewDate: { type: String, required: true }
+  interviewDate: { type: String, required: true },
+  rounds: { type: Number, required: true, min: 0, max: 10 }
 });
 
 module.exports = mongoose.model("Company" , companySchema);
