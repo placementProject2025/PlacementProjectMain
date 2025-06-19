@@ -1,113 +1,139 @@
+const mongoose = require("mongoose");
+const mongodbConnection = require("../config/db.js");
+const shortListModel = require("../models/ShortList.js");
+const studentModel = require("../models/Student.js");
+const companyModel = require("../models/Company.js");
 
-const mongoose = require('mongoose');
-const mongodbConnection = require('../config/db.js');
-const ShortListModel = require('../models/ShortList.js');
-const CompanyModel = require('../models/Company.js');
-const StudentModel = require('../models/Student.js');
-
-const updateShortListRound = async (req, res) => {
+// Handle company click and filter eligible students
+const handleCompanyClick = async (req, res) => {
   try {
-    const { studentId, companyId, roundNumber } = req.body;
-    const roundNum = Number(roundNumber);
-    const year = req.body.year || req.query.year || req.headers['x-db-year'] || req.app.locals.dbYear;
+    const year =
+      req.body.year ||
+      req.app.locals.dbYear ||
+      req.params.year ||
+      req.query.year ||
+      req.headers["x-db-year"];
 
-    if (!year) {
-       return res.status(400).json({ error: "Year is required" });
-     } 
+    const { companyId } = req.body;
 
-    if (!studentId || !companyId || !roundNum) {
-      return res.status(400).json({ error: "studentId, companyId, and roundNumber are required" });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(studentId) || !mongoose.Types.ObjectId.isValid(companyId)) {
-      return res.status(400).json({ error: "Invalid studentId or companyId" });
+    if (!companyId) {
+      return res.status(400).json({ error: "companyId is required" });
     }
 
     const conn = await mongodbConnection(year);
-    const ShortList = conn.model('shortList', ShortListModel.schema);
-    const Company = conn.model('Company', CompanyModel.schema);
-    const Student = StudentModel(conn);
+    const ShortList = conn.model("shortList", shortListModel.schema);
+    const Student = studentModel(conn);
+    const Company = conn.model("Company", companyModel.schema);
 
     const company = await Company.findById(companyId);
-    if (!company) {
-      return res.status(404).json({ error: "Company not found" });
+    if (!company) return res.status(404).json({ message: "Company not found" });
+
+    let maxArrears = 0;
+
+    if (
+      company.historyofArrears &&
+      !["no", "none", "0", "nan"].includes(
+        company.historyofArrears.toString().trim().toLowerCase()
+      )
+    ) {
+      maxArrears = Number(company.historyofArrears);
     }
 
-    
-    const student = await Student.findById(studentId);
-    if (!student) {
-       return res.status(404).json({ error: "Student not found" });
-    }
-
-    const totalRounds = company.rounds;
-
-    if (roundNum < 1 || roundNum > totalRounds) {
-      return res.status(400).json({ error: "Invalid round number" });
-    }
-
-    let shortListDoc = await ShortList.findOne({
-      studentId: new mongoose.Types.ObjectId(studentId),
-      companyId: new mongoose.Types.ObjectId(companyId)
+    const eligibleStudents = await Student.find({
+      studentTenthPercentage: { $gte: company.tenth },
+      studentTwelthPercentage: { $gte: company.twelfth },
+      studentUGCGPA: { $gte: company.cgpa },
+      studentHistoryOfArrears: { $lte: maxArrears },
     });
 
-    if (!shortListDoc) {
-      if (roundNum !== 1) {
-        return res.status(400).json({ error: "You must complete round 1 first." });
-      }
-
-      let roundsObj = new Map();
-      for (let i = 1; i <= totalRounds; i++) {
-        roundsObj.set(`round${i}`, false);
-      }
-      roundsObj.set(`round${roundNum}`, true);
-
-      shortListDoc = await ShortList.create({
-        studentId,
-        companyId,
-        rounds: roundsObj
+    for (const student of eligibleStudents) {
+      const already = await ShortList.findOne({
+        studentId: student._id,
+        companyId: companyId,
       });
-
-      return res.status(200).json({ message: `Round ${roundNum} updated successfully.` });
-    }
-
-    // Validate previous round is completed
-    if (roundNum > 1 && !shortListDoc.rounds.get(`round${roundNum - 1}`)) {
-      return res.status(400).json({ error: `You must complete round ${roundNum - 1} first.` });
-    }
-
-    // Check if this round is already completed
-    if (shortListDoc.rounds.get(`round${roundNum}`)) {
-      return res.status(200).json({ message: `Round ${roundNum} is already completed.` });
-    }
-
-    // Update the current round
-    shortListDoc.rounds.set(`round${roundNum}`, true);
-
-    // Check if all rounds are completed
-    let allRoundsCompleted = true;
-    for (let i = 1; i <= totalRounds; i++) {
-      if (!shortListDoc.rounds.get(`round${i}`)) {
-        allRoundsCompleted = false;
-        break;
+      if (!already) {
+        await ShortList.create({
+          studentId: student._id,
+          companyId: companyId,
+          rounds: new Map(),
+          finalResult: false,
+        });
       }
     }
 
-    // Update finalResult if all rounds completed
-    if (allRoundsCompleted) {
-      shortListDoc.finalResult = true;
-    }
-
-    await shortListDoc.save();
-
-    return res.status(200).json({
-      message: `Round ${roundNum} updated successfully.`,
-      finalResult: shortListDoc.finalResult
-    });
-
+    const shortListed = await ShortList.find({ companyId }).populate("studentId");
+    res.status(200).json(shortListed);
   } catch (error) {
-    console.error("Error updating shortList:", error);
-    return res.status(500).json({ error: "Internal Server Error" });
+    console.error("Error:", error);
+    res.status(500).json({ error: "Server error" });
   }
 };
 
-module.exports = { updateShortListRound };
+// Update round selection
+const updateRounds = async (req, res) => {
+  try {
+    const year =
+      req.app.locals.dbYear ||
+      req.body.year ||
+      req.query.year ||
+      req.headers["x-db-year"];
+    const updates = req.body.updates;
+
+    const conn = await mongodbConnection(year);
+    const ShortList = conn.model("shortList", shortListModel.schema);
+
+    for (const update of updates) {
+      const existing = await ShortList.findOne({
+        studentId: update.studentId,
+        companyId: update.companyId,
+      });
+
+      if (existing) {
+        for (const [roundKey, status] of Object.entries(update.rounds)) {
+          existing.rounds.set(roundKey, status);
+        }
+        if (update.finalResult !== undefined) {
+          existing.finalResult = update.finalResult;
+        }
+        await existing.save();
+      }
+    }
+
+    res.status(200).json({ message: "Rounds updated successfully" });
+  } catch (err) {
+    console.error("Update Error:", err);
+    res.status(500).json({ error: "Failed to update rounds" });
+  }
+};
+
+// Get shortlisted students
+const getShortlisted = async (req, res) => {
+  try {
+    const year =
+      req.app.locals.dbYear ||
+      req.params.year ||
+      req.query.year ||
+      req.headers["x-db-year"];
+
+    const { companyId } = req.params;
+
+    if (!companyId) {
+      return res.status(400).json({ error: "companyId is required" });
+    }
+
+    const conn = await mongodbConnection(year);
+    const ShortList = conn.model("shortList", shortListModel.schema);
+    const Student = studentModel(conn);
+
+    const shortlisted = await ShortList.find({ companyId })
+      .populate({ path: "studentId", model: Student })
+      .sort({ createdAt: 1 });
+
+    res.status(200).json(shortlisted);
+  } catch (err) {
+    console.error("Error fetching shortlisted students:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+module.exports = { handleCompanyClick, updateRounds, getShortlisted };
