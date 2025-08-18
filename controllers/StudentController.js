@@ -24,7 +24,10 @@ const uploadExcel = async (req, res) => {
           const separator = dobStr.includes(".") ? "." : "-";
           const [dd, mm, yyyy] = dobStr.split(separator);
           if (dd && mm && yyyy) {
-            dob = new Date(`${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`);
+            const parsedDate = new Date(`${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`);
+            if (!isNaN(parsedDate)) {
+              dob = parsedDate;
+            }
           }
         }
 
@@ -43,11 +46,13 @@ const uploadExcel = async (req, res) => {
           studentEmailID: r[13],
           studentCollegeName: r[14],
           studentGraduationYear: r[15],
-          studentHistoryOfArrears: r[16],
+          studentHistoryOfArrears:
+            (typeof r[16] === 'string' && r[16].toLowerCase() === 'na') ? 0 :
+            (isNaN(r[16]) || r[16] === null || r[16] === undefined) ? 0 :
+            Number(r[16]),
           studentPlacementInterest: r[17],
         };
       }).filter((d) => d && d.studentRegisterNumber && d.studentName);
-
 
 
     const conn = await mongodbConnection(year);

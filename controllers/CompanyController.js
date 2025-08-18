@@ -5,7 +5,8 @@ const CompanyModel = require('../models/Company.js');
 
 const addcompany= async (req, res) => {
   try {
-    const conn = await mongodbConnection(req.app.locals.dbYear);
+    console.log("Received Company Data:", req.body);  // check 
+    const conn = await mongodbConnection(req.query.year || req.app.locals.dbYear);
     const Company = conn.model('Company', CompanyModel.schema);
     const newcompany = await Company.create(req.body);
     res.json(newcompany);
@@ -16,7 +17,7 @@ const addcompany= async (req, res) => {
 
 const showAllcompanies= async (req, res) => {
   try {
-    const conn = await mongodbConnection(req.app.locals.dbYear);
+    const conn = await mongodbConnection(req.query.year || req.app.locals.dbYear);
     const Company = conn.model('Company', CompanyModel.schema);
     const companies = await Company.find();
     res.json(companies);
@@ -28,9 +29,8 @@ const showAllcompanies= async (req, res) => {
 const deletecompany=async (req, res) => {
   try {
     const { id } = req.params;
-    const conn = await mongodbConnection(req.app.locals.dbYear);
+    const conn = await mongodbConnection(req.query.year || req.app.locals.dbYear);
     const Company = conn.model('Company', CompanyModel.schema);
-    // Validate ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }

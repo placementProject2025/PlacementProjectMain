@@ -6,7 +6,6 @@ const mongodbConnection = async (year) => {
   const dbname = `batch-${year}`;
   const uri = `mongodb+srv://vcetplacement:placementvcet@placementproject.kmrgs5s.mongodb.net/${dbname}?retryWrites=true&w=majority&appName=Maincluster`;
 
-  // Return cached connection if exists
   if (connections[year]) {
     return connections[year];
   }
@@ -20,7 +19,7 @@ const mongodbConnection = async (year) => {
 
     connection.once("open", () => {
       console.log(`✅ Connected to MongoDB database: ${dbname}`);
-      connections[year] = connection; // cache it
+      connections[year] = connection; 
       resolve(connection);
     });
 

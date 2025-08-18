@@ -4,7 +4,6 @@ const shortListModel = require("../models/ShortList.js");
 const studentModel = require("../models/Student.js");
 const companyModel = require("../models/Company.js");
 
-// Handle company click and filter eligible students
 const handleCompanyClick = async (req, res) => {
   try {
     const year =
@@ -68,8 +67,6 @@ const handleCompanyClick = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
-
-// Update round selection
 const updateRounds = async (req, res) => {
   try {
     const year =
@@ -77,36 +74,56 @@ const updateRounds = async (req, res) => {
       req.body.year ||
       req.query.year ||
       req.headers["x-db-year"];
-    const updates = req.body.updates;
 
+    if (!year) {
+      return res.status(400).json({ error: "Year is required" });
+    }
+
+    const updates = req.body.updates;
     const conn = await mongodbConnection(year);
     const ShortList = conn.model("shortList", shortListModel.schema);
 
     for (const update of updates) {
+      const { studentId, companyId, rounds: newRounds, finalResult } = update;
+
+       
+      console.log("➡ Updating", studentId, companyId); 
+      
       const existing = await ShortList.findOne({
-        studentId: update.studentId,
-        companyId: update.companyId,
+        studentId: new mongoose.Types.ObjectId(studentId),
+        companyId: new mongoose.Types.ObjectId(companyId)
       });
 
       if (existing) {
-        for (const [roundKey, status] of Object.entries(update.rounds)) {
-          existing.rounds.set(roundKey, status);
+        for (const [roundKey, status] of Object.entries(newRounds || {})) {
+        
+        existing.rounds.set(roundKey, status);
+          
         }
-        if (update.finalResult !== undefined) {
-          existing.finalResult = update.finalResult;
+
+        if (typeof finalResult === "boolean") {
+          existing.finalResult = finalResult;
         }
+
         await existing.save();
+      } else {
+        await ShortList.create({
+          studentId,
+          companyId,
+          rounds: new Map(Object.entries(newRounds || {})),
+          finalResult: !!finalResult
+        });
       }
     }
 
     res.status(200).json({ message: "Rounds updated successfully" });
   } catch (err) {
-    console.error("Update Error:", err);
-    res.status(500).json({ error: "Failed to update rounds" });
+    console.error("🔥 Error updating rounds:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
-// Get shortlisted students
+
 const getShortlisted = async (req, res) => {
   try {
     const year =
@@ -125,9 +142,25 @@ const getShortlisted = async (req, res) => {
     const ShortList = conn.model("shortList", shortListModel.schema);
     const Student = studentModel(conn);
 
-    const shortlisted = await ShortList.find({ companyId })
-      .populate({ path: "studentId", model: Student })
-      .sort({ createdAt: 1 });
+    const shortlisted = await ShortList.aggregate([
+      {
+        $match: { companyId: new mongoose.Types.ObjectId(companyId) }
+      },
+      {
+        $group: {
+          _id: "$studentId",
+          latest: { $first: "$$ROOT" }
+        }
+      },
+      {
+        $replaceRoot: { newRoot: "$latest" }
+      }
+    ]);
+
+    await ShortList.populate(shortlisted, {
+      path: "studentId",
+      model: Student
+    });
 
     res.status(200).json(shortlisted);
   } catch (err) {
@@ -136,4 +169,34 @@ const getShortlisted = async (req, res) => {
   }
 };
 
-module.exports = { handleCompanyClick, updateRounds, getShortlisted };
+const getSelectedCompanyIdsForStudent = async (req, res) => {
+  try {
+    const year =
+      req.app.locals.dbYear ||
+      req.query.year ||
+      req.headers["x-db-year"];
+
+    const studentId = req.params.id;
+
+    if (!year || !studentId) {
+      return res.status(400).json({ error: "Year and studentId are required" });
+    }
+
+    const conn = await mongodbConnection(year);
+    const ShortList = conn.model("shortList", shortListModel.schema);
+
+    const selected = await ShortList.find({
+      studentId,
+      finalResult: true
+    }).select("companyId -_id"); // Only return companyId
+
+    const companyIds = selected.map(entry => entry.companyId.toString());
+
+    res.status(200).json(companyIds);
+  } catch (err) {
+    console.error("Error fetching student company IDs:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+};
+
+module.exports = { handleCompanyClick, updateRounds, getShortlisted , getSelectedCompanyIdsForStudent};
