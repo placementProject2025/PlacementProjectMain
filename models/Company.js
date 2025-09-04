@@ -5,8 +5,12 @@ const companySchema = new mongoose.Schema({
   description: { type: String, required: true },
   position: { type: String, required: true },
   tenth: { type: Number, required: true, min: 0, max: 100 },
+<<<<<<< HEAD
   twelfth: { type: Number , min: 0, max: 100 },
   diploma: {type: Number, min: 0 , max: 100},
+=======
+  twelfth: { type: Number, required: true , min: 0, max: 100 },
+>>>>>>> db67e24c4ceaed38646319f7df31979775d48eb3
   cgpa: { type: Number, required: true, min: 0, max: 100 },
   historyofArrears: { type: String, required: true },
   currentArrears: { type: String, required: true },
