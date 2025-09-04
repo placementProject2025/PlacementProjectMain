@@ -15,6 +15,7 @@ const studentSchema = new mongoose.Schema({
   studentEmailID:{ type: String, required: true },
   studentCollegeName:{ type: String, required: true },
   studentGraduationYear:{ type: Number, required: true },
+  studentCurrentArrears:{type:Number , required : true , default : 0},
   studentHistoryOfArrears:{ type: Number, required: true, min: 0 },
   studentPlacementInterest:{ type: String, required: true },
 }, { timestamps: true }); 

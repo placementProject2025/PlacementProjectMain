@@ -3,8 +3,9 @@ const mongodbConnection = require("../config/db.js");
 const shortListModel = require("../models/ShortList.js");
 const studentModel = require("../models/Student.js");
 const companyModel = require("../models/Company.js");
+const { Types } = require("mongoose");
 
-const handleCompanyClick = async (req, res) => {
+const addShortlist = async (req, res) => {
   try {
     const year =
       req.body.year ||
@@ -13,58 +14,56 @@ const handleCompanyClick = async (req, res) => {
       req.query.year ||
       req.headers["x-db-year"];
 
-    const { companyId } = req.body;
+    const { companyId, studentIds } = req.body;
 
     if (!companyId) {
       return res.status(400).json({ error: "companyId is required" });
     }
+    if (!Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ error: "studentIds array is required" });
+    }
 
     const conn = await mongodbConnection(year);
-    const ShortList = conn.model("shortList", shortListModel.schema);
-    const Student = studentModel(conn);
+    const ShortList = conn.model("ShortList", shortListModel.schema);
     const Company = conn.model("Company", companyModel.schema);
+   const Student = studentModel(conn); // 👈 add this
 
-    const company = await Company.findById(companyId);
+    const company = await Company.findById(new Types.ObjectId(companyId));
     if (!company) return res.status(404).json({ message: "Company not found" });
 
-    let maxArrears = 0;
+    console.log("Building shortlist students...");
 
-    if (
-      company.historyofArrears &&
-      !["no", "none", "0", "nan"].includes(
-        company.historyofArrears.toString().trim().toLowerCase()
-      )
-    ) {
-      maxArrears = Number(company.historyofArrears);
+    const bulkOps = studentIds.map((id) => ({
+      updateOne: {
+        filter: { 
+          studentId: new Types.ObjectId(id), 
+          companyId: new Types.ObjectId(companyId) 
+        },
+        update: {
+          $setOnInsert: {
+            studentId: new Types.ObjectId(id),
+            companyId: new Types.ObjectId(companyId),
+            rounds: {},
+            finalResult: false,
+          },
+        },
+        upsert: true,
+      },
+    }));
+
+    if (bulkOps.length > 0) {
+      await ShortList.bulkWrite(bulkOps, { ordered: false });
     }
 
-    const eligibleStudents = await Student.find({
-      studentTenthPercentage: { $gte: company.tenth },
-      studentTwelthPercentage: { $gte: company.twelfth },
-      studentUGCGPA: { $gte: company.cgpa },
-      studentHistoryOfArrears: { $lte: maxArrears },
-    });
+    const shortListed = await ShortList.find({ companyId: new Types.ObjectId(companyId) })
+      .populate("studentId"); 
 
-    for (const student of eligibleStudents) {
-      const already = await ShortList.findOne({
-        studentId: student._id,
-        companyId: companyId,
-      });
-      if (!already) {
-        await ShortList.create({
-          studentId: student._id,
-          companyId: companyId,
-          rounds: new Map(),
-          finalResult: false,
-        });
-      }
-    }
-
-    const shortListed = await ShortList.find({ companyId }).populate("studentId");
     res.status(200).json(shortListed);
   } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ error: "Server error" });
+    console.error("Error in addShortlist:", error);
+    res.status(500).json({
+      error: process.env.NODE_ENV === "development" ? error.message : "Server error",
+    });
   }
 };
 const updateRounds = async (req, res) => {
@@ -139,7 +138,7 @@ const getShortlisted = async (req, res) => {
     }
 
     const conn = await mongodbConnection(year);
-    const ShortList = conn.model("shortList", shortListModel.schema);
+    const ShortList = conn.model("ShortList", shortListModel.schema);
     const Student = studentModel(conn);
 
     const shortlisted = await ShortList.aggregate([
@@ -199,4 +198,110 @@ const getSelectedCompanyIdsForStudent = async (req, res) => {
   }
 };
 
-module.exports = { handleCompanyClick, updateRounds, getShortlisted , getSelectedCompanyIdsForStudent};
+
+
+module.exports = { updateRounds, getShortlisted , getSelectedCompanyIdsForStudent , addShortlist};
+
+
+// const handleCompanyClick = async (req, res) => {
+//   try {
+//     const year =
+//       req.body.year ||
+//       req.app.locals.dbYear ||
+//       req.params.year ||
+//       req.query.year ||
+//       req.headers["x-db-year"];
+
+//     const { companyId } = req.body;
+
+//     if (!companyId) {
+//       return res.status(400).json({ error: "companyId is required" });
+//     }
+
+//     const conn = await mongodbConnection(year);
+//     const ShortList = conn.model("shortList", shortListModel.schema);
+//     const Student = studentModel(conn);
+//     const Company = conn.model("Company", companyModel.schema);
+
+//     const company = await Company.findById(companyId);
+//     if (!company) return res.status(404).json({ message: "Company not found" });
+
+//     let maxArrears = 0;
+
+//     if (
+//       company.historyofArrears &&
+//       !["no", "none", "0", "nan"].includes(
+//         company.historyofArrears.toString().trim().toLowerCase()
+//       )
+//     ) {
+//       maxArrears = Number(company.historyofArrears);
+//     }
+
+//     const eligibleStudents = await Student.aggregate([
+//         {
+//           $addFields: {
+//             twelfthNumeric: {
+//               $cond: [
+//                 {
+//                   $or: [
+//                     { $eq: ["$studentTwelthPercentage", "NA"] },
+//                     { $eq: ["$studentTwelthPercentage", null] },
+//                     { $eq: ["$studentTwelthPercentage", ""] }
+//                   ]
+//                 },
+//                 0,
+//                 { $toDouble: "$studentTwelthPercentage" }
+//               ]
+//             },
+//             diplomaNumeric: {
+//               $cond: [
+//                 {
+//                   $or: [
+//                     { $eq: ["$studentDiploma", "NA"] },
+//                     { $eq: ["$studentDiploma", null] },
+//                     { $eq: ["$studentDiploma", ""] }
+//                   ]
+//                 },
+//                 0,
+//                 { $toDouble: "$studentDiploma" }
+//               ]
+//             }
+//           }
+//         },
+//         {
+//           $match: {
+//             studentTenthPercentage: { $gte: company.tenth },
+//             $or: [
+//               { twelfthNumeric: { $gte: company.twelfth } },
+//               { diplomaNumeric: { $gte: company.diploma } }
+//             ],
+//             studentUGCGPA: { $gte: company.cgpa },
+//             studentHistoryOfArrears: { $lte: maxArrears },
+//             studentCurrentArrears: { $lte: company.currentArrears }
+//           }
+//         }
+//       ]);
+
+
+//     for (const student of eligibleStudents) {
+//       const already = await ShortList.findOne({
+//         studentId: student._id,
+//         companyId: companyId,
+//       });
+//       if (!already) {
+//         await ShortList.create({
+//           studentId: student._id,
+//           companyId: companyId,
+//           rounds: new Map(),
+//           finalResult: false,
+//         });
+//       }
+//     }
+
+//     const shortListed = await ShortList.find({ companyId }).populate("studentId");
+//     res.status(200).json(shortListed);
+//   } catch (error) {
+//     console.error("Error:", error);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };

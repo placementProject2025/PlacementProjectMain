@@ -42,6 +42,7 @@ const uploadExcel = async (req, res) => {
           studentTwelthPercentage: r[8],
           studentDiploma: r[9],
           studentUGCGPA: r[10],
+          studentCurrentArrear: r[11],
           studentMobileNumber: r[12],
           studentEmailID: r[13],
           studentCollegeName: r[14],

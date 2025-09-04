@@ -5,11 +5,12 @@ const {
   handleCompanyClick,
   updateRounds,
   getShortlisted,
-  getSelectedCompanyIdsForStudent
+  getSelectedCompanyIdsForStudent,
+  addShortlist
 } = require("../controllers/shortListController");
 
 
-router.post("/addshortlist", handleCompanyClick);
+router.post("/addshortlist", addShortlist);
 
 router.put("/update-rounds", updateRounds);
 
