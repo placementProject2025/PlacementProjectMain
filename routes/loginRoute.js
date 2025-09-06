@@ -5,7 +5,6 @@ const {getAttendedCompanies,getSelectedCompanies } = require("../controllers/log
 
 const router = express.Router();
 
-
 router.post("/login", loginStudent);
 router.get("/profile", verifyToken, getStudentProfile);
 router.get("/companies/attended", verifyToken, getAttendedCompanies);

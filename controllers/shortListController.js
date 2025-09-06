@@ -26,7 +26,7 @@ const addShortlist = async (req, res) => {
     const conn = await mongodbConnection(year);
     const ShortList = conn.model("ShortList", shortListModel.schema);
     const Company = conn.model("Company", companyModel.schema);
-   const Student = studentModel(conn); // 👈 add this
+   //const Student = studentModel(conn); 
 
     const company = await Company.findById(new Types.ObjectId(companyId));
     if (!company) return res.status(404).json({ message: "Company not found" });
@@ -95,9 +95,7 @@ const updateRounds = async (req, res) => {
 
       if (existing) {
         for (const [roundKey, status] of Object.entries(newRounds || {})) {
-        
-        existing.rounds.set(roundKey, status);
-          
+          existing.rounds.set(roundKey, status);  
         }
 
         if (typeof finalResult === "boolean") {
@@ -198,110 +196,28 @@ const getSelectedCompanyIdsForStudent = async (req, res) => {
   }
 };
 
+const deleteShortlistStudent = async (req , res) => {
+  try {
+    const year =
+      req.app.locals.dbYear ||
+      req.params.year ||
+      req.query.year ||
+      req.headers["x-db-year"];
 
+    const companyId = req.params.companyId;
 
-module.exports = { updateRounds, getShortlisted , getSelectedCompanyIdsForStudent , addShortlist};
+    if (!year || !companyId) {
+      return res.status(400).json({ error: "Year and companyId are required" });
+    }
 
+    const conn = await mongodbConnection(year);
+    const ShortList = conn.model("ShortList", shortListModel.schema);
+    await ShortList.deleteMany({ companyId: new mongoose.Types.ObjectId(companyId) });
+    res.status(200).json({ message : "success"});
+    console.log(`Deleted shortlist docs for company ${companyId}`);  
+  } catch (err) {
+    console.error("Error deleting shortlist:", err);
+  }
+};
 
-// const handleCompanyClick = async (req, res) => {
-//   try {
-//     const year =
-//       req.body.year ||
-//       req.app.locals.dbYear ||
-//       req.params.year ||
-//       req.query.year ||
-//       req.headers["x-db-year"];
-
-//     const { companyId } = req.body;
-
-//     if (!companyId) {
-//       return res.status(400).json({ error: "companyId is required" });
-//     }
-
-//     const conn = await mongodbConnection(year);
-//     const ShortList = conn.model("shortList", shortListModel.schema);
-//     const Student = studentModel(conn);
-//     const Company = conn.model("Company", companyModel.schema);
-
-//     const company = await Company.findById(companyId);
-//     if (!company) return res.status(404).json({ message: "Company not found" });
-
-//     let maxArrears = 0;
-
-//     if (
-//       company.historyofArrears &&
-//       !["no", "none", "0", "nan"].includes(
-//         company.historyofArrears.toString().trim().toLowerCase()
-//       )
-//     ) {
-//       maxArrears = Number(company.historyofArrears);
-//     }
-
-//     const eligibleStudents = await Student.aggregate([
-//         {
-//           $addFields: {
-//             twelfthNumeric: {
-//               $cond: [
-//                 {
-//                   $or: [
-//                     { $eq: ["$studentTwelthPercentage", "NA"] },
-//                     { $eq: ["$studentTwelthPercentage", null] },
-//                     { $eq: ["$studentTwelthPercentage", ""] }
-//                   ]
-//                 },
-//                 0,
-//                 { $toDouble: "$studentTwelthPercentage" }
-//               ]
-//             },
-//             diplomaNumeric: {
-//               $cond: [
-//                 {
-//                   $or: [
-//                     { $eq: ["$studentDiploma", "NA"] },
-//                     { $eq: ["$studentDiploma", null] },
-//                     { $eq: ["$studentDiploma", ""] }
-//                   ]
-//                 },
-//                 0,
-//                 { $toDouble: "$studentDiploma" }
-//               ]
-//             }
-//           }
-//         },
-//         {
-//           $match: {
-//             studentTenthPercentage: { $gte: company.tenth },
-//             $or: [
-//               { twelfthNumeric: { $gte: company.twelfth } },
-//               { diplomaNumeric: { $gte: company.diploma } }
-//             ],
-//             studentUGCGPA: { $gte: company.cgpa },
-//             studentHistoryOfArrears: { $lte: maxArrears },
-//             studentCurrentArrears: { $lte: company.currentArrears }
-//           }
-//         }
-//       ]);
-
-
-//     for (const student of eligibleStudents) {
-//       const already = await ShortList.findOne({
-//         studentId: student._id,
-//         companyId: companyId,
-//       });
-//       if (!already) {
-//         await ShortList.create({
-//           studentId: student._id,
-//           companyId: companyId,
-//           rounds: new Map(),
-//           finalResult: false,
-//         });
-//       }
-//     }
-
-//     const shortListed = await ShortList.find({ companyId }).populate("studentId");
-//     res.status(200).json(shortListed);
-//   } catch (error) {
-//     console.error("Error:", error);
-//     res.status(500).json({ error: "Server error" });
-//   }
-// };
+module.exports = { updateRounds, getShortlisted , getSelectedCompanyIdsForStudent , addShortlist , deleteShortlistStudent};

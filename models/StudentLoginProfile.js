@@ -1,8 +1,3 @@
-
-
-// models/StudentLoginProfile.js   (final, minimal, no password)
-
-
 const mongoose = require("mongoose");
 
 const studentSchema = new mongoose.Schema(

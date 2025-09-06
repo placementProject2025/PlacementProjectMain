@@ -2,10 +2,9 @@ const mongoose = require('mongoose');
 const mongodbConnection = require('../config/db.js');
 const CompanyModel = require('../models/Company.js');
 
-
 const addcompany= async (req, res) => {
   try {
-    console.log("Received Company Data:", req.body);  // check 
+    console.log("Received Company Data:", req.body);   
     const conn = await mongodbConnection(req.query.year || req.app.locals.dbYear);
     const Company = conn.model('Company', CompanyModel.schema);
     const newcompany = await Company.create(req.body);
@@ -34,7 +33,6 @@ const deletecompany=async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
-
     const deleted = await Company.findByIdAndDelete(id);
 
     if (!deleted) {
