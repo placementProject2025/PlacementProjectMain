@@ -220,4 +220,104 @@ const deleteShortlistStudent = async (req , res) => {
   }
 };
 
-module.exports = { updateRounds, getShortlisted , getSelectedCompanyIdsForStudent , addShortlist , deleteShortlistStudent};
+const getStudentCompaniesWithRounds = async (req, res) => {
+  try {
+    const year =
+      req.app.locals.dbYear ||
+      req.query.year ||
+      req.params.year ||
+      req.headers["x-db-year"];
+
+    const studentId = req.params.id;
+    if (!studentId) {
+      return res.status(400).json({ error: "studentId is required" });
+    }
+
+    const conn = await mongodbConnection(year);
+    const ShortList = conn.model("ShortList", shortListModel.schema);
+    const Company = conn.model("Company", companyModel.schema);
+    const companyColl = Company.collection.name;
+    const agg = [
+      { $match: { studentId: new mongoose.Types.ObjectId(studentId), companyId: { $ne: null } } },
+      { $sort: { updatedAt: -1 } },
+      { $group: { _id: "$companyId", latest: { $first: "$$ROOT" } } },
+      { $replaceRoot: { newRoot: "$latest" } },
+      { $lookup: { from: companyColl, localField: "companyId", foreignField: "_id", as: "company" } },
+      { $unwind: { path: "$company", preserveNullAndEmptyArrays: false } },
+      {
+        $project: {
+          _id: 0,
+          companyId: "$company._id",
+          companyName: "$company.name",
+          rounds: "$rounds",
+          finalResult: "$finalResult",
+          updatedAt: "$updatedAt"
+        }
+      }
+    ];
+
+    const records = await ShortList.aggregate(agg);
+
+    const companies = records.map((r) => ({
+      companyId: r.companyId ? r.companyId.toString() : null,
+      companyName: r.companyName || null,
+      rounds: r.rounds && typeof r.rounds === 'object' ? (r.rounds instanceof Map ? Object.fromEntries(r.rounds) : r.rounds) : {},
+      finalResult: !!r.finalResult,
+      updatedAt: r.updatedAt
+    }));
+
+
+    return res.status(200).json({ studentId, companies });
+  } catch (err) {
+    console.error("Error in getStudentCompaniesWithRounds:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
+const getFinalSelectedCompaniesForStudentByYear = async (req, res) => {
+  try {
+    const year = req.params.year || req.query.year || req.app.locals.dbYear || req.headers["x-db-year"];
+
+    if (!year) {
+      return res.status(400).json({ error: "Year required in params" });
+    }
+
+    const conn = await mongodbConnection(year);
+    const ShortList = conn.model("ShortList", shortListModel.schema);
+    const Company = conn.model("Company", companyModel.schema);
+
+    const agg = [
+      { $match: { finalResult: true } },
+      { $sort: { updatedAt: -1 } },
+      {
+        $group: {
+          _id: { studentId: "$studentId", companyId: "$companyId" },
+          latest: { $first: "$$ROOT" },
+        },
+      },
+      { $replaceRoot: { newRoot: "$latest" } },
+      {
+        $project: {
+          _id: 0,
+          studentId: "$studentId",
+          companyId: "$companyId",
+        },
+      },
+    ];
+
+    const records = await ShortList.aggregate(agg);
+
+    const results = records.map((r) => ({
+      studentId: r.studentId ? r.studentId.toString() : null,
+      companyId: r.companyId ? r.companyId.toString() : null,
+    }));
+
+    return res.status(200).json({ results });
+  } catch (err) {
+    console.error("Error in getFinalSelectedCompaniesForStudentByYear:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
+
+module.exports = { updateRounds, getShortlisted , getSelectedCompanyIdsForStudent , addShortlist , deleteShortlistStudent , getStudentCompaniesWithRounds , getFinalSelectedCompaniesForStudentByYear};
