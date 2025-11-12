@@ -9,6 +9,7 @@ const companyRoute = require('./routes/companyRoute');
 const studentRoute = require('./routes/studentRoute');
 const authRoutes = require("./routes/loginRoute");
 const { MongoClient } = require('mongodb');
+const finalCompanyRoute = require('./routes/FinalCompanyRoute');
 
 
 const app = express();
@@ -86,6 +87,7 @@ app.get('/getdbprevious' , async (req , res) => {
 app.use('/api/student', studentRoute);
 app.use('/api/company', companyRoute);
 app.use('/api/shortlist', shortListRoute);
+app.use('/api/finalcompany', finalCompanyRoute);
 app.use("/api/auth", authRoutes);
 
 app.listen(5000, () => {
