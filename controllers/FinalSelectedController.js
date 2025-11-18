@@ -6,14 +6,21 @@ const mongodbConnection = require("../config/db.js");
 
 const setCompanyAsFinal = async (req, res) => {
   try {
-    const { studentId, companyId } = req.body;
-    const conn = await mongodbConnection(req.query.year || req.app.locals.dbYear);
+    const { studentId, companyId , studentRole} = req.body;
+    const conn = await mongodbConnection(req.query.year || req.app.locals.dbYear || req.body.year);
     const FinalSelected = conn.model("FinalSelected", finalSelectedSchema.schema);
+
+    if (!studentId || !companyId || !studentRole) {
+      return res.status(400).json({
+        error: "studentId, companyId and studentRole are required"
+      });
+    }
 
     const existing = await FinalSelected.findOne({ studentId });
 
     if (existing) {
       existing.companyId = companyId;
+      existing.studentRole = studentRole;
       await existing.save();
 
       return res.status(200).json({
@@ -22,7 +29,7 @@ const setCompanyAsFinal = async (req, res) => {
       });
     }
 
-    const final = await FinalSelected.create({ studentId, companyId });
+    const final = await FinalSelected.create({ studentId, companyId , studentRole});
     res.status(201).json({
       message: "Final selection created successfully.",
       created: final,

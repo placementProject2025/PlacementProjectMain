@@ -8,7 +8,8 @@ const {
   getStudentCompaniesWithRounds,
   getFinalSelectedCompaniesForStudentByYear,
   addShortlist,
-  deleteShortlistStudent
+  deleteShortlistStudent,
+  studentRoleUpdate
 } = require("../controllers/shortListController");
 
 router.post("/addshortlist", addShortlist);
@@ -18,5 +19,6 @@ router.get("/:id/companies", getSelectedCompanyIdsForStudent);
 router.get("/:id/companies-rounds", getStudentCompaniesWithRounds);
 router.get("/final-selected-students/:year", getFinalSelectedCompaniesForStudentByYear);
 router.delete("/deleteshortlist/:year/:companyId" , deleteShortlistStudent);
+router.put("/student-role-update" , studentRoleUpdate);
 
 module.exports = router;

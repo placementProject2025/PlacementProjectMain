@@ -319,5 +319,42 @@ const getFinalSelectedCompaniesForStudentByYear = async (req, res) => {
   }
 };
 
+const studentRoleUpdate = async (req, res) => {
+  try {
+    const year =
+      req.app.locals.dbYear ||
+      req.body.year ||
+      req.query.year ||
+      req.headers["x-db-year"];
 
-module.exports = { updateRounds, getShortlisted , getSelectedCompanyIdsForStudent , addShortlist , deleteShortlistStudent , getStudentCompaniesWithRounds , getFinalSelectedCompaniesForStudentByYear};
+    const { studentId, companyId, studentRole } = req.body;
+
+    if (!year || !studentId || !companyId || !studentRole) {
+      return res.status(400).json({ error: "year, studentId, companyId and studentRole are required" });
+    }
+
+    const conn = await mongodbConnection(year);
+    const ShortList = conn.model("shortList", shortListModel.schema);
+
+    const updated = await ShortList.findOneAndUpdate(
+      { studentId, companyId },   
+      { studentRole },            
+      { new: true }               
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: "Shortlist entry not found" });
+    }
+
+    res.json({
+      message: "Student role updated successfully",
+      data: updated
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Error", error });
+  }
+};
+
+
+module.exports = { updateRounds, getShortlisted , getSelectedCompanyIdsForStudent , addShortlist , deleteShortlistStudent , getStudentCompaniesWithRounds , getFinalSelectedCompaniesForStudentByYear , studentRoleUpdate};

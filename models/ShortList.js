@@ -20,6 +20,11 @@ const ShortListSchema = new mongoose.Schema({
   finalResult: {
     type: Boolean,
     default: false   
+  },
+  
+  studentRole : {
+    type: String,
+    default: null,
   }
 }, { timestamps: true });
 
