@@ -20,6 +20,7 @@ const setCompanyAsFinal = async (req, res) => {
 
     if (existing) {
       existing.companyId = companyId;
+      existing.studentRole = studentRole;
       await existing.save();
 
       return res.status(200).json({
