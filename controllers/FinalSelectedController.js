@@ -10,9 +10,9 @@ const setCompanyAsFinal = async (req, res) => {
     const conn = await mongodbConnection(req.query.year || req.app.locals.dbYear || req.body.year);
     const FinalSelected = conn.model("FinalSelected", finalSelectedSchema.schema);
 
-    if (!studentId || !companyId || !studentRole) {
+    if (!studentId || !companyId) {
       return res.status(400).json({
-        error: "studentId, companyId and studentRole are required"
+        error: "studentId and companyId are required"
       });
     }
 
@@ -20,7 +20,6 @@ const setCompanyAsFinal = async (req, res) => {
 
     if (existing) {
       existing.companyId = companyId;
-      existing.studentRole = studentRole;
       await existing.save();
 
       return res.status(200).json({
