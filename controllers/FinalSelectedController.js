@@ -3,18 +3,30 @@ const finalSelectedSchema = require("../models/FinalSelected.js");
 const studentModel = require("../models/Student.js");
 const companyModel = require("../models/Company.js");
 const mongodbConnection = require("../config/db.js");
+const shortListModel = require("../models/ShortList");
 
 const setCompanyAsFinal = async (req, res) => {
   try {
-    const { studentId, companyId , studentRole} = req.body;
+    const { studentId, companyId} = req.body;
     const conn = await mongodbConnection(req.query.year || req.app.locals.dbYear || req.body.year);
     const FinalSelected = conn.model("FinalSelected", finalSelectedSchema.schema);
+    const Shortlist = conn.model("shortList", shortListModel.schema); 
 
     if (!studentId || !companyId) {
       return res.status(400).json({
         error: "studentId and companyId are required"
       });
     }
+
+    const shortlist = await Shortlist.findOne({ studentId, companyId });
+
+    let studentRole = "Selected";
+
+    if (shortlist && shortlist.studentRole) {
+      studentRole = shortlist.studentRole;
+    }
+
+    console.log("🎯 ROLE FETCHED FROM SHORTLIST:", studentRole);
 
     const existing = await FinalSelected.findOne({ studentId });
 
