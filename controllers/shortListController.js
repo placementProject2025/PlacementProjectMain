@@ -44,7 +44,7 @@ const addShortlist = async (req, res) => {
             studentId: new Types.ObjectId(id),
             companyId: new Types.ObjectId(companyId),
             rounds: {},
-            finalResult: false,
+            finalResult: false
           },
         },
         upsert: true,
@@ -83,23 +83,34 @@ const updateRounds = async (req, res) => {
     const ShortList = conn.model("shortList", shortListModel.schema);
 
     for (const update of updates) {
-      const { studentId, companyId, rounds: newRounds, finalResult } = update;
+      const {
+        studentId,
+        companyId,
+        rounds: newRounds,
+        finalResult,
+        studentRole,
+      } = update;
 
-       
-      console.log("➡ Updating", studentId, companyId); 
-      
+      console.log("➡ Updating", studentId, companyId);
+
       const existing = await ShortList.findOne({
         studentId: new mongoose.Types.ObjectId(studentId),
-        companyId: new mongoose.Types.ObjectId(companyId)
+        companyId: new mongoose.Types.ObjectId(companyId),
       });
 
       if (existing) {
-        for (const [roundKey, status] of Object.entries(newRounds || {})) {
-          existing.rounds.set(roundKey, status);  
+        if (newRounds) {
+          for (const [roundKey, status] of Object.entries(newRounds)) {
+            existing.rounds.set(roundKey, status);
+          }
         }
 
         if (typeof finalResult === "boolean") {
           existing.finalResult = finalResult;
+        }
+
+        if (studentRole) {
+          existing.studentRole = studentRole;
         }
 
         await existing.save();
@@ -108,7 +119,8 @@ const updateRounds = async (req, res) => {
           studentId,
           companyId,
           rounds: new Map(Object.entries(newRounds || {})),
-          finalResult: !!finalResult
+          finalResult: !!finalResult,
+          studentRole: studentRole || null,
         });
       }
     }
@@ -119,7 +131,6 @@ const updateRounds = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
-
 
 const getShortlisted = async (req, res) => {
   try {
@@ -185,7 +196,7 @@ const getSelectedCompanyIdsForStudent = async (req, res) => {
     const selected = await ShortList.find({
       studentId,
       finalResult: true
-    }).select("companyId -_id"); // Only return companyId
+    }).select("companyId -_id"); 
 
     const companyIds = selected.map(entry => entry.companyId.toString());
 
@@ -236,7 +247,9 @@ const getStudentCompaniesWithRounds = async (req, res) => {
     const conn = await mongodbConnection(year);
     const ShortList = conn.model("ShortList", shortListModel.schema);
     const Company = conn.model("Company", companyModel.schema);
+
     const companyColl = Company.collection.name;
+
     const agg = [
       { $match: { studentId: new mongoose.Types.ObjectId(studentId), companyId: { $ne: null } } },
       { $sort: { updatedAt: -1 } },
@@ -251,6 +264,7 @@ const getStudentCompaniesWithRounds = async (req, res) => {
           companyName: "$company.name",
           rounds: "$rounds",
           finalResult: "$finalResult",
+          studentRole: "$studentRole",
           updatedAt: "$updatedAt"
         }
       }
@@ -263,6 +277,7 @@ const getStudentCompaniesWithRounds = async (req, res) => {
       companyName: r.companyName || null,
       rounds: r.rounds && typeof r.rounds === 'object' ? (r.rounds instanceof Map ? Object.fromEntries(r.rounds) : r.rounds) : {},
       finalResult: !!r.finalResult,
+      studentRole: r.studentRole || null,
       updatedAt: r.updatedAt
     }));
 
@@ -319,42 +334,4 @@ const getFinalSelectedCompaniesForStudentByYear = async (req, res) => {
   }
 };
 
-const studentRoleUpdate = async (req, res) => {
-  try {
-    const year =
-      req.app.locals.dbYear ||
-      req.body.year ||
-      req.query.year ||
-      req.headers["x-db-year"];
-
-    const { studentId, companyId, studentRole } = req.body;
-
-    if (!year || !studentId || !companyId || !studentRole) {
-      return res.status(400).json({ error: "year, studentId, companyId and studentRole are required" });
-    }
-
-    const conn = await mongodbConnection(year);
-    const ShortList = conn.model("shortList", shortListModel.schema);
-
-    const updated = await ShortList.findOneAndUpdate(
-      { studentId, companyId },   
-      { studentRole },            
-      { new: true }               
-    );
-
-    if (!updated) {
-      return res.status(404).json({ message: "Shortlist entry not found" });
-    }
-
-    res.json({
-      message: "Student role updated successfully",
-      data: updated
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: "Error", error });
-  }
-};
-
-
-module.exports = { updateRounds, getShortlisted , getSelectedCompanyIdsForStudent , addShortlist , deleteShortlistStudent , getStudentCompaniesWithRounds , getFinalSelectedCompaniesForStudentByYear , studentRoleUpdate};
+module.exports = { updateRounds, getShortlisted , getSelectedCompanyIdsForStudent , addShortlist , deleteShortlistStudent , getStudentCompaniesWithRounds , getFinalSelectedCompaniesForStudentByYear};
