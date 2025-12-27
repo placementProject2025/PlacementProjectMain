@@ -334,4 +334,73 @@ const getFinalSelectedCompaniesForStudentByYear = async (req, res) => {
   }
 };
 
-module.exports = { updateRounds, getShortlisted , getSelectedCompanyIdsForStudent , addShortlist , deleteShortlistStudent , getStudentCompaniesWithRounds , getFinalSelectedCompaniesForStudentByYear};
+const getPlacedStudentsReport = async (req, res) => {
+  try {
+    const year = req.app.locals.dbYear || req.query.year || req.headers["x-db-year"];
+    if (!year) return res.status(400).json({ error: "Year is required" });
+
+    const conn = await mongodbConnection(year);
+    const Student = studentModel(conn);
+    
+    conn.model("shortList", shortListModel.schema); 
+    conn.model("Company", companyModel.schema);
+
+    const report = await Student.aggregate([
+      {
+        $lookup: {
+          from: "shortlists", 
+          let: { studentId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$studentId", "$$studentId"] },
+                    { $eq: ["$finalResult", true] }, 
+                  ],
+                },
+              },
+            },
+            {
+              $lookup: {
+                from: "companies",          
+                localField: "companyId",   
+                foreignField: "_id",       
+                as: "companyInfo"          
+              },
+            },
+            { $unwind: "$companyInfo" },
+            {
+              $project: {
+                _id: 0,
+                companyName: "$companyInfo.name", 
+                role: "$studentRole" 
+              }
+            }
+          ],
+          as: "placedCompanies",
+        },
+      },
+      {
+        $match: {
+          placedCompanies: { $ne: [] }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          studentName: 1,
+          studentRegisterNumber: 1,
+          placedCompanies: 1
+        },
+      },
+    ]);
+
+    res.status(200).json(report);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server Error" });
+  }
+};
+
+module.exports = { updateRounds, getShortlisted , getSelectedCompanyIdsForStudent , addShortlist , deleteShortlistStudent , getStudentCompaniesWithRounds , getFinalSelectedCompaniesForStudentByYear , getPlacedStudentsReport};
