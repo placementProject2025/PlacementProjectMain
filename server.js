@@ -4,17 +4,18 @@ const mongoose = require('mongoose');
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const cron = require('node-cron');
+const { MongoClient } = require('mongodb');
+
 const shortListRoute = require('./routes/ShortListRoutes');
 const companyRoute = require('./routes/companyRoute');
 const studentRoute = require('./routes/studentRoute');
-const adminRoutes = require("./routes/AdminloginRoute");
 const authRoutes = require("./routes/loginRoute");
-const { MongoClient } = require('mongodb');
 const finalCompanyRoute = require('./routes/FinalCompanyRoute');
-
+const adminRoutes = require("./routes/AdminloginRoute");
+const studentPortalRoute = require('./routes/studentPortalRoute');
 
 const app = express();
-
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -89,8 +90,9 @@ app.use('/api/student', studentRoute);
 app.use('/api/company', companyRoute);
 app.use('/api/shortlist', shortListRoute);
 app.use('/api/finalcompany', finalCompanyRoute);
-app.use('/api/admin', adminRoutes);
 app.use("/api/auth", authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/student-portal', studentPortalRoute);
 
 app.listen(5000, () => {
   console.log('🚀 Server running at http://localhost:5000');
