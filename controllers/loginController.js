@@ -13,7 +13,7 @@ exports.loginStudent = async (req, res) => {
   }
 
   try {
-   
+
     const conn = await mongodbConnection(year);
     const Student = getStudentModel(conn);
     const student = await Student.findOne({ studentRegisterNumber: Number(registerNumber) });
@@ -35,11 +35,11 @@ exports.loginStudent = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials (DOB mismatch)" });
     }
     const token = jwt.sign(
-      { studentId: student._id, year },
+      { studentId: student._id, year, role: 'student' },
       process.env.JWT_SECRET || "supersecret",
       { expiresIn: "1h" }
     );
-    res.status(200).json({ token, profile: student });
+    res.status(200).json({ token, role: 'student', profile: student });
   } catch (err) {
     console.error("Login Error:", err);
     res.status(500).json({ message: "Server error" });
@@ -75,7 +75,7 @@ exports.getAttendedCompanies = async (req, res) => {
 
     const companyNames = shortlisted
       .map(entry => entry.companyId?.name)
-      .filter(Boolean); 
+      .filter(Boolean);
 
     res.status(200).json({ companyNames });
   } catch (err) {
