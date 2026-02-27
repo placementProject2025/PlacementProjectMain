@@ -4,7 +4,6 @@ const mongoose = require('mongoose');
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const cron = require('node-cron');
 const { MongoClient } = require('mongodb');
 
 const shortListRoute = require('./routes/ShortListRoutes');
