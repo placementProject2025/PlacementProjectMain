@@ -4,7 +4,7 @@ const connections = {}; // Cache: year -> mongoose connection
 
 const mongodbConnection = async (year) => {
   const dbname = `batch-${year}`;
-  const uri = `mongodb+srv://vcetplacement:placementvcet@placementproject.kmrgs5s.mongodb.net/${dbname}?retryWrites=true&w=majority&appName=Maincluster`;
+  const uri = process.env.MONGO_URL.replace("{DBname}", dbname);
 
   if (connections[year]) {
     return connections[year];
@@ -31,4 +31,3 @@ const mongodbConnection = async (year) => {
 };
 
 module.exports = mongodbConnection;
-
