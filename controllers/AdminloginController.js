@@ -12,11 +12,14 @@ const adminLogin = async (req, res) => {
     }
 
     const adminConnection = await connectAdminDB();
-    const Admin = adminConnection.model('Admin', AdminModel.schema);
+    const Admin =
+      adminConnection.models.Admin ||
+      adminConnection.model("Admin", AdminModel.schema, "credentials");    
+    const cleanId = String(adminId).trim();
 
     const admin = await Admin.findOne({
-      id: { $regex: `^${adminId}$`, $options: "i" },
-      password: password
+      password,
+      id: { $regex: `^${cleanId}$`, $options: "i" }
     });
 
 
