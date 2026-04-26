@@ -33,28 +33,28 @@ async function connectToMongo() {
 
 app.get("/databases", async (req, res) => {
   try {
+    await connectToMongo();
     const dbs = await client.db().admin().listDatabases();
+
     const filtered = dbs.databases
-      .filter((db) => !["admin", "local", "config"].includes(db.name))
+      // ❌ remove system + adminpass DBs
+      .filter((db) => !["admin", "local", "config", "adminpass"].includes(db.name))
+      
+      // ✅ keep only batch-YYYY format
+      .filter((db) => /^batch-\d{4}$/.test(db.name))
+
       .map((db, idx) => {
-        const match = db.name.match(/batch-(\d{4})/); 
-        let startYear = "Unknown";
-        let endYear = "Unknown";
-
-        if (match) {
-          endYear = match[1]; 
-          startYear = (parseInt(endYear) - 4).toString(); 
-        }
-
+        const year = db.name.match(/\d{4}/)[0];
         return {
           id: idx + 1,
           name: db.name,
-          startYear,
-          endYear,
+          startYear: (parseInt(year) - 4).toString(),
+          endYear: year
         };
       })
+
       .sort((a, b) => parseInt(b.endYear) - parseInt(a.endYear))
-      .slice(0, 7)                            
+      .slice(0, 6)
       .map((db, idx) => ({
         id: idx + 1,
         name: db.name,
